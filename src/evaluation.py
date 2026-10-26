@@ -84,14 +84,15 @@ def evaluate(models, data):
         print('Test metrics:', row, flush=True)
     # - FID memakai Inception-v3 2048-dim dari torch-fidelity
     torch.hub.set_dir(str(ROOT / 'data' / 'torch_cache'))
-    fid = FrechetInceptionDistance(feature=2048, normalize=False, reset_real_features=False).to(DEVICE)
-    fid.set_dtype(torch.float64)
+    # - Features FP32; akumulasi covariance TorchMetrics tetap FP64
+    fid = FrechetInceptionDistance(feature=2048, normalize=False, reset_real_features=False, antialias=False).to(DEVICE)
     indices = np.random.default_rng(2026).choice(len(test_images), CONFIG['fid_samples'], replace=False)
     np.save(OUTPUT / 'fid_test_indices.npy', indices)
     def to_rgb(images):
         return (images.clamp(0, 1) * 255).round().to(torch.uint8).repeat(1, 3, 1, 1)
     for start in range(0, len(indices), 64):
         fid.update(to_rgb(test_images[indices[start:start + 64]]), real=True)
+    print('Real FID features ready.', flush=True)
     for name in ['VAE', 'GAN', 'DCGAN', 'DDPM']:
         seed_everything(2026)
         fid.reset()
@@ -126,7 +127,7 @@ def evaluate(models, data):
         hidden = models[name].encoder(test_images)
         summary[name + '_latent_mean_abs'] = float(hidden.abs().mean())
         summary[name + '_latent_zero_fraction'] = float((hidden < 1e-3).float().mean())
-    summary['fid_protocol'] = {'feature': 2048, 'real_count': CONFIG['fid_samples'], 'fake_count': CONFIG['fid_samples'], 'real_source': 'fixed random subset of internal test', 'input': 'rounded uint8 RGB replication; torch-fidelity internal resize', 'seed': 2026}
+    summary['fid_protocol'] = {'feature': 2048, 'real_count': CONFIG['fid_samples'], 'fake_count': CONFIG['fid_samples'], 'real_source': 'fixed random subset of internal test', 'input': 'rounded uint8 RGB replication; torch-fidelity TensorFlow-compatible resize; antialias=False', 'feature_precision': 'FP32', 'covariance_precision': 'FP64', 'seed': 2026}
     (OUTPUT / 'summary.json').write_text(json.dumps(summary, indent=2))
     pd.DataFrame(rows).to_csv(OUTPUT / 'metrics.csv', index=False)
     return pd.DataFrame(rows), summary
