@@ -47,6 +47,9 @@ def synchronize():
 
 
 def prepare_data():
+    config_path = OUTPUT / 'config.json'
+    if config_path.exists() and json.loads(config_path.read_text()) != CONFIG:
+        raise ValueError('Configuration berubah. Arsipkan outputs sebelum memulai eksperimen baru.')
     # - Gabungkan official partitions sebelum split internal 80/10/10
     original_train = FashionMNIST(ROOT / 'data', train=True, download=True)
     original_test = FashionMNIST(ROOT / 'data', train=False, download=True)
@@ -105,6 +108,8 @@ def train_model(name, data, classifier=None):
     diffusion = Diffusion(DEVICE, CONFIG['diffusion_steps'])
     checkpoint = OUTPUT / f'{name}.pt'
     if checkpoint.exists():
+        if not (OUTPUT / f'{name}_selection.json').exists():
+            raise RuntimeError(f'{name}: training sebelumnya belum lengkap. Arsipkan checkpoint parsial sebelum mengulang.')
         model.load_state_dict(torch.load(checkpoint, map_location=DEVICE, weights_only=True))
         print(f'{name}: memakai checkpoint tersimpan', flush=True)
         return model.eval()
@@ -156,6 +161,8 @@ def train_gan(name, data):
     discriminator = Discriminator(convolutional).to(DEVICE)
     checkpoint = OUTPUT / f'{name}.pt'
     if checkpoint.exists():
+        if not (OUTPUT / f'{name}_selection.json').exists():
+            raise RuntimeError(f'{name}: training sebelumnya belum lengkap. Arsipkan checkpoint parsial sebelum mengulang.')
         generator.load_state_dict(torch.load(checkpoint, map_location=DEVICE, weights_only=True))
         return generator.eval()
     if convolutional:
@@ -185,8 +192,6 @@ def train_gan(name, data):
             discriminator_optimizer.step()
             generator_optimizer.zero_grad(set_to_none=True)
             discriminator.requires_grad_(False)
-            # - Bekukan statistik BatchNorm discriminator selama update generator
-            discriminator.eval()
             fake_logits = discriminator(fake)
             generator_loss = F.binary_cross_entropy_with_logits(fake_logits, torch.ones_like(fake_logits))
             if not torch.isfinite(generator_loss + discriminator_loss):
