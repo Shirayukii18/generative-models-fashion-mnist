@@ -13,3 +13,7 @@ python evaluate.py
 ```
 
 Untuk menjalankan kode per cell, buka [notebook](Generative_Models.ipynb). Dataset diunduh saat pertama kali diperlukan. Checkpoint, metrik, dan figure disimpan di folder `outputs/`.
+
+## Riwayat kode
+
+[Riwayat eksperimen](../../commits/experiment-history/) menampilkan tiga revisi kode dari pengerjaan lokal, termasuk implementasi awal dan perbaikan BatchNorm DCGAN. Branch ini hanya memuat file kode publik dari commit asal. Identitas commit disamarkan.
